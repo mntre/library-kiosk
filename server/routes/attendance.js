@@ -9,7 +9,7 @@ router.post('/clock-in', async (req, res) => {
   try {
     const currentTime = new Date();
     const { data, error } = await supabase
-      .from('attendance_logs')
+      .from('Attendance Logs Table')
       .insert([{
         student_number: studentNumber,
         full_name: fullName,
@@ -55,7 +55,7 @@ router.post('/clock-out', async (req, res) => {
 
     // Find active session for today
     const { data: activeSession, error: sessionError } = await supabase
-      .from('attendance_logs')
+      .from('Attendance Logs Table')
       .select('*')
       .eq('student_number', studentNumber)
       .eq('status', 'active')
@@ -79,7 +79,7 @@ router.post('/clock-out', async (req, res) => {
     const duration = Math.round((currentTime - new Date(activeSession.time_in)) / 1000);
 
     const { error: updateError } = await supabase
-      .from('attendance_logs')
+      .from('Attendance Logs Table')
       .update({
         time_out: currentTime.toISOString(),
         duration,
@@ -112,7 +112,7 @@ router.get('/status/:studentNumber', async (req, res) => {
 
   try {
     const { data: session, error } = await supabase
-      .from('attendance_logs')
+      .from('Attendance Logs Table')
       .select(`
         id,
         student_number,
@@ -167,7 +167,7 @@ router.get('/status/:studentNumber', async (req, res) => {
 router.get('/active-sessions', async (req, res) => {
   try {
     const { data: sessions, error } = await supabase
-      .from('attendance_logs')
+      .from('Attendance Logs Table')
       .select(`
         id,
         student_number,

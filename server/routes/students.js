@@ -8,7 +8,7 @@ router.get('/:studentNumber', async (req, res) => {
 
   try {
     const { data: student, error } = await supabase
-      .from('students')
+      .from('Students Table')
       .select('*')
       .eq('student_number', studentNumber)
       .single();
@@ -35,7 +35,7 @@ router.get('/search/:query', async (req, res) => {
 
   try {
     const { data: students, error } = await supabase
-      .from('students')
+      .from('Students Table')
       .select('*')
       .or(`student_number.ilike.%${query}%,full_name.ilike.%${query}%`)
       .limit(10);
@@ -58,7 +58,7 @@ router.post('/', async (req, res) => {
 
   try {
     const { data, error } = await supabase
-      .from('students')
+      .from('Students Table')
       .insert([{
         student_number: studentNumber,
         full_name: fullName,

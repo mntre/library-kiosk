@@ -9,7 +9,7 @@ router.post('/login', async (req, res) => {
 
   try {
     const { data: user, error } = await supabase
-      .from('admin_users')
+      .from('Admin Users Table')
       .select('*')
       .eq('username', username)
       .single();
@@ -51,7 +51,7 @@ router.get('/logs', async (req, res) => {
     const offset = (page - 1) * limit;
 
     let query = supabase
-      .from('attendance_logs')
+      .from('Attendance Logs Table')
       .select(`
         id,
         student_number,
@@ -115,7 +115,7 @@ router.get('/stats', async (req, res) => {
 
     // Total visits today
     const { data: todayTotal, error: todayError } = await supabase
-      .from('attendance_logs')
+      .from('Attendance Logs Table')
       .select('count', { count: 'exact', head: true })
       .gte('time_in', today + 'T00:00:00Z')
       .eq('status', 'closed');
@@ -127,7 +127,7 @@ router.get('/stats', async (req, res) => {
 
     // Active sessions
     const { data: activeTotal, error: activeError } = await supabase
-      .from('attendance_logs')
+      .from('Attendance Logs Table')
       .select('count', { count: 'exact', head: true })
       .eq('status', 'active');
 
@@ -138,7 +138,7 @@ router.get('/stats', async (req, res) => {
 
     // Average duration today
     const { data: avgDuration, error: avgError } = await supabase
-      .from('attendance_logs')
+      .from('Attendance Logs Table')
       .select('duration')
       .gte('time_in', today + 'T00:00:00Z')
       .eq('status', 'closed')
@@ -170,7 +170,7 @@ router.post('/close-session', async (req, res) => {
 
   try {
     const { data: session, error: sessionError } = await supabase
-      .from('attendance_logs')
+      .from('Attendance Logs Table')
       .select('*')
       .eq('id', logId)
       .single();
@@ -194,7 +194,7 @@ router.post('/close-session', async (req, res) => {
     );
 
     const { error: updateError } = await supabase
-      .from('attendance_logs')
+      .from('Attendance Logs Table')
       .update({
         time_out: currentTime.toISOString(),
         duration,
