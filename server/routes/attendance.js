@@ -19,6 +19,7 @@ router.post('/clock-in', async (req, res) => {
         last_name:       lastName       || null,
         first_name:      firstName      || null,
         middle_name:     middleName     || null,
+        full_name:       [firstName, middleName, lastName].filter(Boolean).join(' ') || null,
         education_level: educationLevel || null,
         strand:          strand         || null,
         custom_strand:   customStrand   || null,
