@@ -351,6 +351,7 @@ const KioskScreen = () => {
                       onClick={() => {
                         setEducationLevel('college');
                         setStrand('');
+                        setYearLevel('');
                       }}
                       className={`py-3 px-4 rounded-lg border-2 font-medium transition-all
                         ${educationLevel === 'college'
@@ -365,6 +366,7 @@ const KioskScreen = () => {
                       onClick={() => {
                         setEducationLevel('senior-high');
                         setProgram('');
+                        setYearLevel('');
                       }}
                       className={`py-3 px-4 rounded-lg border-2 font-medium transition-all
                         ${educationLevel === 'senior-high'
@@ -453,25 +455,35 @@ const KioskScreen = () => {
                   </div>
                 )}
 
-                {/* Year Level */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Year Level
-                  </label>
-                  <select
-                    value={yearLevel}
-                    onChange={(e) => setYearLevel(e.target.value)}
-                    className="w-full px-4 py-3 text-lg rounded-lg border-2 border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all"
-                    disabled={isLoading}
-                  >
-                    <option value="">Select year level</option>
-                    <option value="1st">1st Year</option>
-                    <option value="2nd">2nd Year</option>
-                    <option value="3rd">3rd Year</option>
-                    <option value="4th">4th Year</option>
-                    <option value="5th">5th Year</option>
-                  </select>
-                </div>
+                {/* Year Level - only shows after education level is selected */}
+                {educationLevel && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Year Level
+                    </label>
+                    <select
+                      value={yearLevel}
+                      onChange={(e) => setYearLevel(e.target.value)}
+                      className="w-full px-4 py-3 text-lg rounded-lg border-2 border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all"
+                      disabled={isLoading}
+                    >
+                      <option value="">Select year level</option>
+                      {educationLevel === 'college' ? (
+                        <>
+                          <option value="1st Year">1st Year</option>
+                          <option value="2nd Year">2nd Year</option>
+                          <option value="3rd Year">3rd Year</option>
+                          <option value="4th Year">4th Year</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="Grade 11">Grade 11</option>
+                          <option value="Grade 12">Grade 12</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+                )}
 
                 {/* Purpose */}
                 <div>
