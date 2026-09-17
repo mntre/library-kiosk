@@ -27,7 +27,11 @@ router.post('/clock-in', async (req, res) => {
 
     if (error) {
       console.error('Error inserting attendance log:', error);
-      return res.status(500).json({ error: 'Failed to clock in' });
+      return res.status(500).json({ 
+        error: 'Failed to clock in', 
+        detail: error.message,
+        code: error.code
+      });
     }
 
     res.json({

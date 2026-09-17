@@ -212,7 +212,7 @@ const KioskScreen = () => {
       setShowSuccess(true);
     } catch (error) {
       console.error('Error submitting:', error);
-      setError(error.response?.data?.error || 'An error occurred. Please try again.');
+      setError(error.response?.data?.detail || error.response?.data?.error || 'An error occurred. Please try again.');
     } finally {
       setIsLoading(false);
     }
