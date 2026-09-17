@@ -1,215 +1,196 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
-// Reusable option tile component
-const OptionTile = ({ selected, onClick, emoji, label, sublabel, disabled }) => (
+/* ── Tile option ──────────────────────────────────── */
+const Tile = ({ selected, onClick, emoji, label, sublabel, disabled }) => (
   <button
     type="button"
     onClick={onClick}
     disabled={disabled}
-    className={`relative flex flex-col items-center justify-center gap-1 p-3 rounded-2xl border-2 text-xs font-semibold transition-all duration-200
-      ${selected
-        ? 'border-indigo-500 bg-gradient-to-b from-indigo-50 to-white text-indigo-700 shadow-lg shadow-indigo-100 scale-[1.04]'
-        : 'border-gray-200 bg-white text-gray-600 hover:border-indigo-300 hover:bg-indigo-50/40 hover:scale-[1.02]'
-      } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+    className={`tile ${selected ? 'selected' : ''}`}
   >
     {selected && (
-      <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-indigo-500 rounded-full flex items-center justify-center text-white text-[9px]">✓</span>
+      <span style={{
+        position: 'absolute', top: 6, right: 6,
+        width: 16, height: 16, borderRadius: '50%',
+        background: '#6366f1', display: 'flex', alignItems: 'center',
+        justifyContent: 'center', fontSize: 9, color: '#fff', fontWeight: 700
+      }}>✓</span>
     )}
-    <span className="text-2xl leading-none">{emoji}</span>
-    <span className="text-center leading-tight font-bold">{label}</span>
-    {sublabel && <span className="text-center leading-tight text-gray-400 font-normal text-[10px] hidden sm:block">{sublabel}</span>}
+    <span style={{ fontSize: 22, lineHeight: 1 }}>{emoji}</span>
+    <span style={{ fontSize: 11, fontWeight: 700, color: selected ? '#a5b4fc' : '#c4c4e0', textAlign: 'center', lineHeight: 1.2 }}>{label}</span>
+    {sublabel && (
+      <span style={{ fontSize: 9, color: '#4a4a6a', textAlign: 'center', lineHeight: 1.2, display: 'block' }}>{sublabel}</span>
+    )}
   </button>
 );
 
+/* ── Field label ──────────────────────────────────── */
+const FieldLabel = ({ icon, text, required }) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+    <span style={{ fontSize: 13 }}>{icon}</span>
+    <span style={{ fontSize: 12, fontWeight: 600, color: '#8b8baa', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{text}</span>
+    {required && <span style={{ color: '#ef4444', fontSize: 12 }}>*</span>}
+  </div>
+);
+
+/* ── Main component ───────────────────────────────── */
 const KioskScreen = () => {
   const [studentNumber, setStudentNumber] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [educationLevel, setEducationLevel] = useState('');
-  const [strand, setStrand] = useState('');
-  const [customStrand, setCustomStrand] = useState('');
-  const [program, setProgram] = useState('');
+  const [fullName, setFullName]           = useState('');
+  const [educationLevel, setEducLevel]    = useState('');
+  const [strand, setStrand]               = useState('');
+  const [customStrand, setCustomStrand]   = useState('');
+  const [program, setProgram]             = useState('');
   const [customProgram, setCustomProgram] = useState('');
-  const [yearLevel, setYearLevel] = useState('');
-  const [purpose, setPurpose] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [successData, setSuccessData] = useState({ name: '', type: '', time: '' });
-  const [error, setError] = useState('');
+  const [yearLevel, setYearLevel]         = useState('');
+  const [purpose, setPurpose]             = useState('');
+  const [isLoading, setIsLoading]         = useState(false);
+  const [showSuccess, setShowSuccess]     = useState(false);
+  const [successData, setSuccessData]     = useState({});
+  const [error, setError]                 = useState('');
   const [currentSession, setCurrentSession] = useState(null);
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const [countdown, setCountdown] = useState(4);
-  const [formVisible, setFormVisible] = useState(false);
-  // Track the last confirmed student number so we know when it's been modified
-  const lastConfirmedNumber = useRef('');
+  const [currentTime, setCurrentTime]     = useState(new Date());
+  const [countdown, setCountdown]         = useState(4);
+  const [visible, setVisible]             = useState(false);
 
-  const studentLookupTimer = useRef(null);
-  const sessionCheckTimer = useRef(null);
+  const lastConfirmed  = useRef('');
+  const lookupTimer    = useRef(null);
+  const sessionTimer   = useRef(null);
 
-  const seniorHighStrands = [
-    { code: 'STEM', emoji: '🔬', name: 'STEM', full: 'Science, Technology, Engineering & Math' },
-    { code: 'HUMMS', emoji: '📜', name: 'HUMMS', full: 'Humanities & Social Sciences' },
-    { code: 'ABM', emoji: '💼', name: 'ABM', full: 'Accountancy, Business & Management' },
-    { code: 'GAS', emoji: '🎓', name: 'GAS', full: 'General Academic Strand' },
-    { code: 'OTHER', emoji: '✏️', name: 'Other', full: 'Type your strand below' },
+  /* ── Data ─────────────────────────────────────── */
+  const shs = [
+    { code:'STEM',  emoji:'🔬', name:'STEM',  full:'Science, Tech, Engineering & Math' },
+    { code:'HUMMS', emoji:'📜', name:'HUMMS', full:'Humanities & Social Sciences' },
+    { code:'ABM',   emoji:'💼', name:'ABM',   full:'Accountancy, Business & Management' },
+    { code:'GAS',   emoji:'🎓', name:'GAS',   full:'General Academic Strand' },
+    { code:'OTHER', emoji:'✏️', name:'Other', full:'Type your strand below' },
   ];
-
-  const collegePrograms = [
-    { code: 'BSA', emoji: '📊', name: 'BSA', full: 'BS Accountancy' },
-    { code: 'BSBA-MM', emoji: '📣', name: 'BSBA-MM', full: 'BSBA Marketing Management' },
-    { code: 'BSBA-HRM', emoji: '🤝', name: 'BSBA-HRM', full: 'BSBA Human Resource Management' },
-    { code: 'BSIT', emoji: '💻', name: 'BSIT', full: 'BS Information Technology' },
-    { code: 'BSCpE', emoji: '🖥️', name: 'BSCpE', full: 'BS Computer Engineering' },
-    { code: 'BSIE', emoji: '⚙️', name: 'BSIE', full: 'BS Industrial Engineering' },
-    { code: 'BSCS', emoji: '🧠', name: 'BSCS', full: 'BS Computer Science' },
-    { code: 'BSPSY', emoji: '🧬', name: 'BSPSY', full: 'BS Psychology' },
-    { code: 'BSHM', emoji: '🏨', name: 'BSHM', full: 'BS Hospitality Management' },
-    { code: 'BSTM', emoji: '✈️', name: 'BSTM', full: 'BS Tourism Management' },
-    { code: 'BEEd', emoji: '🍎', name: 'BEEd', full: 'Bachelor of Elementary Education' },
-    { code: 'BSEd', emoji: '📐', name: 'BSEd', full: 'Bachelor of Secondary Education' },
-    { code: 'OTHER', emoji: '✏️', name: 'Other', full: 'Type your program below' },
+  const programs = [
+    { code:'BSA',      emoji:'📊', name:'BSA',      full:'BS Accountancy' },
+    { code:'BSBA-MM',  emoji:'📣', name:'BSBA-MM',  full:'BSBA Marketing Mgmt' },
+    { code:'BSBA-HRM', emoji:'🤝', name:'BSBA-HRM', full:'BSBA Human Resource' },
+    { code:'BSIT',     emoji:'💻', name:'BSIT',     full:'BS Info Technology' },
+    { code:'BSCpE',    emoji:'🖥️', name:'BSCpE',    full:'BS Computer Engineering' },
+    { code:'BSIE',     emoji:'⚙️', name:'BSIE',     full:'BS Industrial Engineering' },
+    { code:'BSCS',     emoji:'🧠', name:'BSCS',     full:'BS Computer Science' },
+    { code:'BSPSY',    emoji:'🧬', name:'BSPSY',    full:'BS Psychology' },
+    { code:'BSHM',     emoji:'🏨', name:'BSHM',     full:'BS Hospitality Mgmt' },
+    { code:'BSTM',     emoji:'✈️', name:'BSTM',     full:'BS Tourism Management' },
+    { code:'BEEd',     emoji:'🍎', name:'BEEd',     full:'Bachelor of Elem Ed' },
+    { code:'BSEd',     emoji:'📐', name:'BSEd',     full:'Bachelor of Sec Ed' },
+    { code:'OTHER',    emoji:'✏️', name:'Other',    full:'Type your program below' },
   ];
-
   const collegeYears = [
-    { value: '1st Year', emoji: '1️⃣', label: '1st Year' },
-    { value: '2nd Year', emoji: '2️⃣', label: '2nd Year' },
-    { value: '3rd Year', emoji: '3️⃣', label: '3rd Year' },
-    { value: '4th Year', emoji: '4️⃣', label: '4th Year' },
+    { value:'1st Year', emoji:'1️⃣', label:'1st Year' },
+    { value:'2nd Year', emoji:'2️⃣', label:'2nd Year' },
+    { value:'3rd Year', emoji:'3️⃣', label:'3rd Year' },
+    { value:'4th Year', emoji:'4️⃣', label:'4th Year' },
   ];
-
   const shsYears = [
-    { value: 'Grade 11', emoji: '🟡', label: 'Grade 11' },
-    { value: 'Grade 12', emoji: '🟢', label: 'Grade 12' },
+    { value:'Grade 11', emoji:'🟡', label:'Grade 11' },
+    { value:'Grade 12', emoji:'🟢', label:'Grade 12' },
   ];
-
   const purposes = [
-    { value: 'Research', emoji: '🔬' },
-    { value: 'Study', emoji: '📖' },
-    { value: 'Print/Photocopy', emoji: '🖨️' },
-    { value: 'Borrow Book', emoji: '📕' },
-    { value: 'Computer Use', emoji: '💻' },
-    { value: 'Other', emoji: '📌' },
+    { value:'Research',       emoji:'🔬' },
+    { value:'Study',          emoji:'📖' },
+    { value:'Print/Photocopy',emoji:'🖨️' },
+    { value:'Borrow Book',    emoji:'📕' },
+    { value:'Computer Use',   emoji:'💻' },
+    { value:'Other',          emoji:'📌' },
   ];
 
+  /* ── Effects ──────────────────────────────────── */
   useEffect(() => {
-    setTimeout(() => setFormVisible(true), 100);
-    const clockInterval = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(clockInterval);
+    setTimeout(() => setVisible(true), 80);
+    const t = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(t);
   }, []);
 
   useEffect(() => {
-    if (showSuccess) {
-      let count = 4;
-      setCountdown(count);
-      const interval = setInterval(() => {
-        count -= 1;
-        setCountdown(count);
-        if (count <= 0) { clearInterval(interval); resetForm(); }
-      }, 1000);
-      return () => clearInterval(interval);
-    }
+    if (!showSuccess) return;
+    let c = 4; setCountdown(c);
+    const t = setInterval(() => {
+      c -= 1; setCountdown(c);
+      if (c <= 0) { clearInterval(t); resetForm(); }
+    }, 1000);
+    return () => clearInterval(t);
   }, [showSuccess]);
 
-  // Clear all dependent fields
-  const clearDependentFields = () => {
-    setFullName('');
-    setEducationLevel('');
-    setStrand('');
-    setCustomStrand('');
-    setProgram('');
-    setCustomProgram('');
-    setYearLevel('');
-    setPurpose('');
-    setCurrentSession(null);
-    setError('');
-    lastConfirmedNumber.current = '';
+  /* ── Helpers ──────────────────────────────────── */
+  const clearDependent = () => {
+    setFullName(''); setEducLevel(''); setStrand(''); setCustomStrand('');
+    setProgram(''); setCustomProgram(''); setYearLevel(''); setPurpose('');
+    setCurrentSession(null); setError(''); lastConfirmed.current = '';
   };
 
-  const checkSession = async (number) => {
-    if (!number || number.length < 6) return;
-    if (sessionCheckTimer.current) clearTimeout(sessionCheckTimer.current);
-    sessionCheckTimer.current = setTimeout(async () => {
+  const checkSession = (num) => {
+    if (!num || num.length < 6) return;
+    if (sessionTimer.current) clearTimeout(sessionTimer.current);
+    sessionTimer.current = setTimeout(async () => {
       try {
-        const response = await axios.get(`/api/attendance/status/${number}`);
-        setCurrentSession(response.data.isClockedIn ? response.data.session : null);
-        setError('');
+        const r = await axios.get(`/api/attendance/status/${num}`);
+        setCurrentSession(r.data.isClockedIn ? r.data.session : null);
       } catch { /* silent */ }
     }, 600);
   };
 
-  const handleStudentNumberChange = async (e) => {
-    const value = e.target.value;
-    setStudentNumber(value);
+  const handleStudentNumberChange = (e) => {
+    const v = e.target.value;
+    setStudentNumber(v);
     setError('');
-
-    // If the student number was modified after being auto-filled → clear all fields
-    if (lastConfirmedNumber.current && value !== lastConfirmedNumber.current) {
-      clearDependentFields();
-    }
-
-    if (studentLookupTimer.current) clearTimeout(studentLookupTimer.current);
-
-    if (value.length >= 6) {
-      studentLookupTimer.current = setTimeout(async () => {
-        checkSession(value);
+    if (lastConfirmed.current && v !== lastConfirmed.current) clearDependent();
+    if (lookupTimer.current) clearTimeout(lookupTimer.current);
+    if (v.length >= 6) {
+      lookupTimer.current = setTimeout(async () => {
+        checkSession(v);
         try {
-          const response = await axios.get(`/api/students/${value}`);
-          if (response.data.student) {
-            const s = response.data.student;
+          const r = await axios.get(`/api/students/${v}`);
+          if (r.data.student) {
+            const s = r.data.student;
             setFullName(s.full_name || '');
-            setEducationLevel(s.education_level || '');
+            setEducLevel(s.education_level || '');
             setStrand(s.strand || '');
             setProgram(s.program || '');
             setYearLevel(s.year_level || '');
-            lastConfirmedNumber.current = value; // mark as confirmed
+            lastConfirmed.current = v;
           }
         } catch { /* not found */ }
       }, 600);
-    } else {
-      // Number too short — clear all
-      if (lastConfirmedNumber.current) clearDependentFields();
+    } else if (lastConfirmed.current) {
+      clearDependent();
     }
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    if (!studentNumber.trim()) { setError('Please enter your student number'); return; }
-    if (!fullName.trim()) { setError('Please enter your full name'); return; }
-    if (!educationLevel) { setError('Please select your education level'); return; }
-    if (educationLevel === 'senior-high' && !strand) { setError('Please select your strand'); return; }
-    if (educationLevel === 'senior-high' && strand === 'OTHER' && !customStrand.trim()) { setError('Please enter your strand'); return; }
-    if (educationLevel === 'college' && !program) { setError('Please select your program'); return; }
-    if (educationLevel === 'college' && program === 'OTHER' && !customProgram.trim()) { setError('Please enter your program'); return; }
+    e.preventDefault(); setError('');
+    if (!studentNumber.trim()) return setError('Student number is required');
+    if (!fullName.trim())       return setError('Full name is required');
+    if (!educationLevel)        return setError('Please select education level');
+    if (educationLevel === 'senior-high' && !strand) return setError('Please select your strand');
+    if (educationLevel === 'senior-high' && strand === 'OTHER' && !customStrand.trim()) return setError('Please type your strand name');
+    if (educationLevel === 'college' && !program) return setError('Please select your program');
+    if (educationLevel === 'college' && program === 'OTHER' && !customProgram.trim()) return setError('Please type your program name');
 
     setIsLoading(true);
     try {
-      const submittedProgram = educationLevel === 'college' ? (program === 'OTHER' ? customProgram : program) : '';
-      const submittedStrand = educationLevel === 'senior-high' ? (strand === 'OTHER' ? customStrand : strand) : '';
+      const finalProgram = educationLevel === 'college' ? (program === 'OTHER' ? customProgram : program) : '';
+      const finalStrand  = educationLevel === 'senior-high' ? (strand === 'OTHER' ? customStrand : strand) : '';
 
-      try {
-        await axios.get(`/api/students/${studentNumber}`);
-      } catch (err) {
+      try { await axios.get(`/api/students/${studentNumber}`); }
+      catch (err) {
         if (err.response?.status === 404) {
-          await axios.post('/api/students', {
-            studentNumber, fullName, educationLevel,
-            strand: submittedStrand, customStrand,
-            program: submittedProgram, customProgram, yearLevel
-          });
+          await axios.post('/api/students', { studentNumber, fullName, educationLevel, strand: finalStrand, customStrand, program: finalProgram, customProgram, yearLevel });
         }
       }
 
       if (currentSession) {
         await axios.post('/api/attendance/clock-out', { studentNumber });
         const dur = Math.round((new Date() - new Date(currentSession.timeIn)) / 60000);
-        setSuccessData({ name: fullName, type: 'out', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), duration: dur });
+        setSuccessData({ name: fullName, type: 'out', time: new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }), duration: dur });
       } else {
-        await axios.post('/api/attendance/clock-in', {
-          studentNumber, fullName, educationLevel,
-          strand: submittedStrand, customStrand,
-          program: submittedProgram, customProgram, yearLevel, purpose
-        });
-        setSuccessData({ name: fullName, type: 'in', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
+        await axios.post('/api/attendance/clock-in', { studentNumber, fullName, educationLevel, strand: finalStrand, customStrand, program: finalProgram, customProgram, yearLevel, purpose });
+        setSuccessData({ name: fullName, type: 'in', time: new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }) });
       }
       setShowSuccess(true);
     } catch (err) {
@@ -219,312 +200,329 @@ const KioskScreen = () => {
     }
   };
 
-  const resetForm = () => {
-    setStudentNumber(''); clearDependentFields();
-    setShowSuccess(false);
-  };
+  const resetForm = () => { setStudentNumber(''); clearDependent(); setShowSuccess(false); };
 
   const getGreeting = () => {
     const h = currentTime.getHours();
-    if (h < 12) return { text: 'Good Morning', emoji: '☀️' };
-    if (h < 17) return { text: 'Good Afternoon', emoji: '🌤️' };
-    return { text: 'Good Evening', emoji: '🌙' };
+    if (h < 12) return { text: 'Good Morning',   emoji: '☀️' };
+    if (h < 17) return { text: 'Good Afternoon',  emoji: '🌤️' };
+    return           { text: 'Good Evening',     emoji: '🌙' };
   };
+  const g = getGreeting();
 
-  const greeting = getGreeting();
-  const isSubmitDisabled = isLoading || !studentNumber.trim() || !fullName.trim() || !educationLevel
-    || (educationLevel === 'senior-high' && strand === 'OTHER' && !customStrand.trim())
-    || (educationLevel === 'college' && program === 'OTHER' && !customProgram.trim());
+  const canSubmit = !isLoading && studentNumber.trim() && fullName.trim() && educationLevel
+    && !(educationLevel === 'senior-high' && !strand)
+    && !(educationLevel === 'senior-high' && strand === 'OTHER' && !customStrand.trim())
+    && !(educationLevel === 'college' && !program)
+    && !(educationLevel === 'college' && program === 'OTHER' && !customProgram.trim());
 
+  /* ── Render ───────────────────────────────────── */
   return (
-    <div className="min-h-screen animated-bg relative overflow-hidden flex flex-col">
-      {/* Floating orbs */}
-      <div className="orb orb-1 w-96 h-96 bg-purple-500 top-[-100px] left-[-100px]" />
-      <div className="orb orb-2 w-80 h-80 bg-blue-400 bottom-[-80px] right-[-80px]" />
-      <div className="orb orb-3 w-64 h-64 bg-indigo-300 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
-      <div className="absolute inset-0 opacity-5"
-        style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '50px 50px' }} />
+    <div style={{ minHeight:'100vh', background:'var(--bg-base)', display:'flex', flexDirection:'column', position:'relative', overflow:'hidden' }}>
 
-      {/* Header */}
-      <div className="slide-in-down glass border-b border-white/10 py-4 px-6 flex justify-between items-center z-10">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-2xl">📚</div>
+      {/* Dot grid */}
+      <div className="dot-grid" style={{ position:'absolute', inset:0, opacity:0.5, pointerEvents:'none' }} />
+
+      {/* Orbs */}
+      <div className="orb orb-purple" style={{ width:500, height:500, top:-150, left:-150 }} />
+      <div className="orb orb-blue"   style={{ width:400, height:400, bottom:-120, right:-120 }} />
+      <div className="orb orb-cyan"   style={{ width:300, height:300, top:'50%', left:'50%', transform:'translate(-50%,-50%)' }} />
+
+      {/* ── Header ─────────────────────────────── */}
+      <header className="slide-down" style={{
+        background: 'rgba(10,10,15,0.85)',
+        borderBottom: '1px solid #2a2a3a',
+        backdropFilter: 'blur(20px)',
+        padding: '14px 24px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        position: 'relative',
+        zIndex: 10
+      }}>
+        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+          <div style={{ width:42, height:42, borderRadius:10, background:'rgba(99,102,241,0.15)', border:'1px solid rgba(99,102,241,0.3)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>
+            📚
+          </div>
           <div>
-            <h1 className="text-xl font-bold text-white tracking-tight">Library Kiosk</h1>
-            <p className="text-xs text-white/60">{greeting.emoji} {greeting.text}!</p>
+            <div style={{ fontSize:16, fontWeight:800, color:'#f0f0ff', letterSpacing:'-0.02em' }}>
+              Library Kiosk <span style={{ color:'#6366f1' }}>System</span>
+            </div>
+            <div style={{ fontSize:11, color:'#4a4a6a' }}>{g.emoji} {g.text}</div>
           </div>
         </div>
-        <div className="text-right">
-          <div className="text-3xl font-black text-white tracking-tighter">
-            {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </div>
-          <div className="text-xs text-white/60">
-            {currentTime.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+
+        <div style={{ display:'flex', alignItems:'center', gap:16 }}>
+          <div className="badge-live"><div className="dot-live" />LIVE</div>
+          <div style={{ textAlign:'right' }}>
+            <div className="mono" style={{ fontSize:26, fontWeight:700, color:'#f0f0ff', letterSpacing:'-0.03em' }}>
+              {currentTime.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit' })}
+            </div>
+            <div style={{ fontSize:11, color:'#4a4a6a' }}>
+              {currentTime.toLocaleDateString([], { weekday:'long', month:'short', day:'numeric', year:'numeric' })}
+            </div>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Main */}
-      <div className="flex-1 flex items-center justify-center p-4 z-10 overflow-y-auto">
+      {/* ── Body ───────────────────────────────── */}
+      <main style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px 16px', position:'relative', zIndex:10, overflowY:'auto' }}>
 
-        {/* Success */}
+        {/* ── Success ── */}
         {showSuccess ? (
-          <div className="scale-in glass-white rounded-3xl shadow-2xl p-12 text-center max-w-md w-full">
-            <div className="relative w-28 h-28 mx-auto mb-6">
-              <div className={`w-28 h-28 rounded-full flex items-center justify-center text-6xl bounce-check
-                ${successData.type === 'in' ? 'bg-gradient-to-br from-green-400 to-emerald-500' : 'bg-gradient-to-br from-blue-400 to-indigo-500'}`}>
+          <div className="scale-in dark-card" style={{ maxWidth:420, width:'100%', textAlign:'center', padding:'48px 40px', border:'1px solid rgba(99,102,241,0.3)', boxShadow:'0 0 60px rgba(99,102,241,0.15)' }}>
+            <div style={{ position:'relative', width:96, height:96, margin:'0 auto 24px' }}>
+              <div className="bounce-in" style={{
+                width:96, height:96, borderRadius:'50%',
+                background: successData.type === 'in'
+                  ? 'linear-gradient(135deg,#10b981,#059669)'
+                  : 'linear-gradient(135deg,#6366f1,#4f46e5)',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                fontSize:42, boxShadow: successData.type === 'in'
+                  ? '0 0 40px rgba(16,185,129,0.4)'
+                  : '0 0 40px rgba(99,102,241,0.4)'
+              }}>
                 {successData.type === 'in' ? '✓' : '👋'}
               </div>
-              <div className={`absolute inset-0 rounded-full animate-ping opacity-20
-                ${successData.type === 'in' ? 'bg-green-400' : 'bg-blue-400'}`} />
+              <div style={{
+                position:'absolute', inset:0, borderRadius:'50%',
+                background: successData.type === 'in' ? '#10b981' : '#6366f1',
+                animation:'pulse-glow 2s ease-in-out infinite', opacity:0.2
+              }} />
             </div>
-            <h2 className="text-3xl font-black text-gray-800 mb-2">
-              {successData.type === 'in' ? 'Welcome!' : 'Goodbye!'}
-            </h2>
-            <p className="text-xl font-semibold text-gray-700 mb-1">{successData.name}</p>
-            <p className="text-gray-500 mb-2">
-              {successData.type === 'in' ? '🕐 Time In:' : '🕐 Time Out:'}{' '}
-              <span className="font-bold text-indigo-600">{successData.time}</span>
-            </p>
+
+            <div style={{ fontSize:13, fontWeight:600, letterSpacing:'0.12em', textTransform:'uppercase', color: successData.type === 'in' ? '#10b981' : '#6366f1', marginBottom:6 }}>
+              {successData.type === 'in' ? '— Session Started —' : '— Session Ended —'}
+            </div>
+            <div style={{ fontSize:28, fontWeight:900, color:'#f0f0ff', marginBottom:4 }}>{successData.name}</div>
+            <div className="mono" style={{ fontSize:16, color:'#8b8baa', marginBottom: successData.duration ? 4 : 20 }}>
+              {successData.type === 'in' ? 'TIME IN' : 'TIME OUT'}: <span style={{ color:'#f0f0ff', fontWeight:700 }}>{successData.time}</span>
+            </div>
             {successData.type === 'out' && successData.duration !== undefined && (
-              <p className="text-sm text-gray-400 mb-4">Duration: {successData.duration} minutes</p>
+              <div style={{ fontSize:13, color:'#4a4a6a', marginBottom:20 }}>Duration: {successData.duration} min</div>
             )}
-            <div className="mt-6 flex items-center justify-center gap-2">
-              <div className="w-8 h-8 rounded-full border-4 border-indigo-200 border-t-indigo-500 animate-spin" />
-              <span className="text-gray-400 text-sm">New form in {countdown}s...</span>
+
+            <div style={{ height:1, background:'#2a2a3a', margin:'0 0 20px' }} />
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, color:'#4a4a6a', fontSize:13 }}>
+              <div className="mono" style={{
+                width:32, height:32, borderRadius:'50%', border:'2px solid #2a2a3a',
+                borderTopColor:'#6366f1', animation:'spin 1s linear infinite', display:'inline-block'
+              }} />
+              Resetting in {countdown}s…
             </div>
           </div>
 
         ) : (
-          <div className={`glass-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden transition-all duration-700
-            ${formVisible ? 'opacity-100' : 'opacity-0'}`}
-            style={{ transform: formVisible ? 'translateY(0)' : 'translateY(40px)' }}>
+          /* ── Form card ── */
+          <div style={{
+            maxWidth: 540, width:'100%',
+            opacity: visible ? 1 : 0,
+            transform: visible ? 'translateY(0)' : 'translateY(32px)',
+            transition: 'opacity 0.6s ease, transform 0.6s cubic-bezier(.16,1,.3,1)'
+          }}>
+            {/* Card */}
+            <div className="dark-card" style={{ overflow:'hidden', boxShadow:'0 24px 80px rgba(0,0,0,0.6)' }}>
 
-            {/* Card Header */}
-            <div className={`p-6 text-white relative overflow-hidden
-              ${currentSession ? 'bg-gradient-to-r from-orange-500 to-red-500' : 'bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600'}`}>
-              <div className="absolute inset-0 opacity-10"
-                style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
-              <div className="relative flex items-center gap-3">
-                <span className="text-3xl">{currentSession ? '🔓' : '🔐'}</span>
+              {/* Card top bar */}
+              <div style={{
+                padding:'18px 24px',
+                background: currentSession
+                  ? 'linear-gradient(135deg,rgba(239,68,68,0.15),rgba(220,38,38,0.08))'
+                  : 'linear-gradient(135deg,rgba(99,102,241,0.15),rgba(124,58,237,0.08))',
+                borderBottom: `1px solid ${currentSession ? 'rgba(239,68,68,0.2)' : 'rgba(99,102,241,0.2)'}`,
+                display:'flex', alignItems:'center', gap:12
+              }}>
+                <div style={{
+                  width:40, height:40, borderRadius:10,
+                  background: currentSession ? 'rgba(239,68,68,0.2)' : 'rgba(99,102,241,0.2)',
+                  border: `1px solid ${currentSession ? 'rgba(239,68,68,0.3)' : 'rgba(99,102,241,0.3)'}`,
+                  display:'flex', alignItems:'center', justifyContent:'center', fontSize:20
+                }}>
+                  {currentSession ? '🔓' : '🔐'}
+                </div>
                 <div>
-                  <h2 className="text-2xl font-black">{currentSession ? 'Clock Out' : 'Clock In'}</h2>
-                  <p className="text-white/70 text-sm">
+                  <div style={{ fontSize:18, fontWeight:800, color:'#f0f0ff' }}>
+                    {currentSession ? 'Clock Out' : 'Clock In'}
+                  </div>
+                  <div style={{ fontSize:12, color:'#4a4a6a' }}>
                     {currentSession
-                      ? `Session started at ${new Date(currentSession.timeIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                      : 'Fill in your details to enter the library'}
-                  </p>
+                      ? `Active since ${new Date(currentSession.timeIn).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })}`
+                      : 'Enter your details below'}
+                  </div>
+                </div>
+                {/* Corner decoration */}
+                <div style={{ marginLeft:'auto', opacity:0.3, fontSize:10, color:'#6366f1', fontFamily:'JetBrains Mono', letterSpacing:'0.1em' }}>
+                  LIB-KIOSK v2
                 </div>
               </div>
+
+              {/* Form body */}
+              <form onSubmit={handleSubmit} style={{ padding:'22px 24px', display:'flex', flexDirection:'column', gap:18 }}>
+
+                {/* Error */}
+                {error && (
+                  <div className="fade-in" style={{ display:'flex', alignItems:'center', gap:10, background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.25)', borderRadius:10, padding:'10px 14px' }}>
+                    <span style={{ fontSize:16 }}>⚠️</span>
+                    <span style={{ fontSize:13, color:'#fca5a5' }}>{error}</span>
+                  </div>
+                )}
+
+                {/* Active session banner */}
+                {currentSession && (
+                  <div className="fade-in" style={{ display:'flex', alignItems:'center', gap:10, background:'rgba(245,158,11,0.1)', border:'1px solid rgba(245,158,11,0.25)', borderRadius:10, padding:'10px 14px' }}>
+                    <span style={{ fontSize:16 }}>⏱️</span>
+                    <div>
+                      <div style={{ fontSize:13, fontWeight:600, color:'#fcd34d' }}>Session in progress</div>
+                      <div style={{ fontSize:11, color:'#78716c' }}>Submit to clock out and end your session</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Row 1: Student # + Full Name */}
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+                  <div>
+                    <FieldLabel icon="🎓" text="Student Number" required />
+                    <input
+                      className="input-dark"
+                      type="text"
+                      value={studentNumber}
+                      onChange={handleStudentNumberChange}
+                      placeholder="e.g. 21100887"
+                      disabled={isLoading}
+                      maxLength={50}
+                    />
+                  </div>
+                  <div>
+                    <FieldLabel icon="👤" text="Full Name" required />
+                    <input
+                      className="input-dark"
+                      type="text"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="Your full name"
+                      disabled={isLoading}
+                      maxLength={100}
+                    />
+                  </div>
+                </div>
+
+                {/* Education Level */}
+                <div>
+                  <FieldLabel icon="🏫" text="Education Level" required />
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                    {[
+                      { val:'college',     emoji:'🎓', label:'College',     sub:'1st – 4th Year' },
+                      { val:'senior-high', emoji:'📖', label:'Senior High', sub:'Grade 11 or 12' },
+                    ].map(o => (
+                      <Tile key={o.val} selected={educationLevel === o.val}
+                        onClick={() => { setEducLevel(o.val); setStrand(''); setProgram(''); setYearLevel(''); }}
+                        emoji={o.emoji} label={o.label} sublabel={o.sub} disabled={isLoading}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Strand */}
+                {educationLevel === 'senior-high' && (
+                  <div className="scale-in">
+                    <FieldLabel icon="📋" text="Strand" required />
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:8 }}>
+                      {shs.map(s => (
+                        <Tile key={s.code} selected={strand === s.code}
+                          onClick={() => { setStrand(s.code); setCustomStrand(''); }}
+                          emoji={s.emoji} label={s.name} sublabel={s.full} disabled={isLoading}
+                        />
+                      ))}
+                    </div>
+                    {strand === 'OTHER' && (
+                      <input autoFocus className="input-dark" style={{ marginTop:10 }}
+                        value={customStrand} onChange={(e) => setCustomStrand(e.target.value)}
+                        placeholder="Type strand name…" disabled={isLoading} maxLength={100}
+                      />
+                    )}
+                  </div>
+                )}
+
+                {/* Program */}
+                {educationLevel === 'college' && (
+                  <div className="scale-in">
+                    <FieldLabel icon="📚" text="Program / Course" required />
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8 }}>
+                      {programs.map(p => (
+                        <Tile key={p.code} selected={program === p.code}
+                          onClick={() => { setProgram(p.code); setCustomProgram(''); }}
+                          emoji={p.emoji} label={p.name} sublabel={p.full} disabled={isLoading}
+                        />
+                      ))}
+                    </div>
+                    {program === 'OTHER' && (
+                      <input autoFocus className="input-dark" style={{ marginTop:10 }}
+                        value={customProgram} onChange={(e) => setCustomProgram(e.target.value)}
+                        placeholder="Type program name…" disabled={isLoading} maxLength={100}
+                      />
+                    )}
+                  </div>
+                )}
+
+                {/* Year Level */}
+                {educationLevel && (
+                  <div className="scale-in">
+                    <FieldLabel icon="📅" text="Year Level" />
+                    <div style={{ display:'grid', gridTemplateColumns: educationLevel === 'college' ? 'repeat(4,1fr)' : 'repeat(2,1fr)', gap:8 }}>
+                      {(educationLevel === 'college' ? collegeYears : shsYears).map(y => (
+                        <Tile key={y.value} selected={yearLevel === y.value}
+                          onClick={() => setYearLevel(yearLevel === y.value ? '' : y.value)}
+                          emoji={y.emoji} label={y.label} disabled={isLoading}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Purpose */}
+                <div>
+                  <FieldLabel icon="🎯" text="Purpose of Visit" />
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
+                    {purposes.map(p => (
+                      <Tile key={p.value} selected={purpose === p.value}
+                        onClick={() => setPurpose(purpose === p.value ? '' : p.value)}
+                        emoji={p.emoji} label={p.value} disabled={isLoading}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Divider */}
+                <div style={{ height:1, background:'#2a2a3a' }} />
+
+                {/* Submit */}
+                <button
+                  type="submit"
+                  disabled={!canSubmit}
+                  className={currentSession ? 'btn-danger' : 'btn-primary'}
+                  style={{ width:'100%', opacity: canSubmit ? 1 : 0.4 }}
+                >
+                  {isLoading ? (
+                    <span style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10 }}>
+                      <svg style={{ animation:'spin 1s linear infinite', width:20, height:20 }} viewBox="0 0 24 24" fill="none">
+                        <circle style={{ opacity:.25 }} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path style={{ opacity:.75 }} fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Processing…
+                    </span>
+                  ) : currentSession ? '🔓  Clock Out' : '🔐  Clock In'}
+                </button>
+
+              </form>
             </div>
 
-            {/* Form */}
-            <form onSubmit={handleSubmit} className="p-6 space-y-5">
-
-              {error && (
-                <div className="fade-in flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-                  <span className="text-lg flex-shrink-0">⚠️</span>
-                  <p>{error}</p>
-                </div>
-              )}
-
-              {currentSession && (
-                <div className="fade-in flex items-center gap-3 bg-orange-50 border border-orange-200 px-4 py-3 rounded-xl">
-                  <span className="text-xl flex-shrink-0">⏱️</span>
-                  <div>
-                    <p className="text-sm font-semibold text-orange-800">Active session detected</p>
-                    <p className="text-xs text-orange-600">Click Clock Out to end your session</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Student Number */}
-              <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
-                  🎓 Student Number <span className="text-red-400">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={studentNumber}
-                  onChange={handleStudentNumberChange}
-                  placeholder="e.g. 21100887"
-                  className="input-glow w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-400 outline-none transition-all duration-200 text-gray-800 font-medium bg-gray-50 focus:bg-white"
-                  disabled={isLoading}
-                  maxLength={50}
-                />
-              </div>
-
-              {/* Full Name */}
-              <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
-                  👤 Full Name <span className="text-red-400">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Enter your full name"
-                  className="input-glow w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-400 outline-none transition-all duration-200 text-gray-800 font-medium bg-gray-50 focus:bg-white"
-                  disabled={isLoading}
-                  maxLength={100}
-                />
-              </div>
-
-              {/* Education Level */}
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
-                  🏫 Education Level <span className="text-red-400">*</span>
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <OptionTile
-                    selected={educationLevel === 'college'}
-                    onClick={() => { setEducationLevel('college'); setStrand(''); setProgram(''); setYearLevel(''); }}
-                    emoji="🎓" label="College" sublabel="1st to 4th Year"
-                    disabled={isLoading}
-                  />
-                  <OptionTile
-                    selected={educationLevel === 'senior-high'}
-                    onClick={() => { setEducationLevel('senior-high'); setStrand(''); setProgram(''); setYearLevel(''); }}
-                    emoji="📖" label="Senior High" sublabel="Grade 11 or 12"
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
-
-              {/* Strand (Senior High) */}
-              {educationLevel === 'senior-high' && (
-                <div className="scale-in space-y-2">
-                  <label className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
-                    📋 Strand <span className="text-red-400">*</span>
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {seniorHighStrands.map((s) => (
-                      <OptionTile
-                        key={s.code}
-                        selected={strand === s.code}
-                        onClick={() => { setStrand(s.code); setCustomStrand(''); }}
-                        emoji={s.emoji} label={s.name} sublabel={s.full}
-                        disabled={isLoading}
-                      />
-                    ))}
-                  </div>
-                  {strand === 'OTHER' && (
-                    <input
-                      type="text"
-                      value={customStrand}
-                      onChange={(e) => setCustomStrand(e.target.value)}
-                      placeholder="Type your strand name..."
-                      className="input-glow w-full px-4 py-3 rounded-xl border-2 border-indigo-200 focus:border-indigo-400 outline-none transition-all duration-200 bg-indigo-50/50 text-gray-800"
-                      disabled={isLoading}
-                      maxLength={100}
-                      autoFocus
-                    />
-                  )}
-                </div>
-              )}
-
-              {/* Program (College) */}
-              {educationLevel === 'college' && (
-                <div className="scale-in space-y-2">
-                  <label className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
-                    📚 Program/Course <span className="text-red-400">*</span>
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {collegePrograms.map((p) => (
-                      <OptionTile
-                        key={p.code}
-                        selected={program === p.code}
-                        onClick={() => { setProgram(p.code); setCustomProgram(''); }}
-                        emoji={p.emoji} label={p.name} sublabel={p.full}
-                        disabled={isLoading}
-                      />
-                    ))}
-                  </div>
-                  {program === 'OTHER' && (
-                    <input
-                      type="text"
-                      value={customProgram}
-                      onChange={(e) => setCustomProgram(e.target.value)}
-                      placeholder="Type your program name..."
-                      className="input-glow w-full px-4 py-3 rounded-xl border-2 border-indigo-200 focus:border-indigo-400 outline-none transition-all duration-200 bg-indigo-50/50 text-gray-800"
-                      disabled={isLoading}
-                      maxLength={100}
-                      autoFocus
-                    />
-                  )}
-                </div>
-              )}
-
-              {/* Year Level */}
-              {educationLevel && (
-                <div className="scale-in space-y-2">
-                  <label className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
-                    📅 Year Level
-                  </label>
-                  <div className={`grid gap-2 ${educationLevel === 'college' ? 'grid-cols-4' : 'grid-cols-2'}`}>
-                    {(educationLevel === 'college' ? collegeYears : shsYears).map((y) => (
-                      <OptionTile
-                        key={y.value}
-                        selected={yearLevel === y.value}
-                        onClick={() => setYearLevel(yearLevel === y.value ? '' : y.value)}
-                        emoji={y.emoji} label={y.label}
-                        disabled={isLoading}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Purpose */}
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
-                  🎯 Purpose of Visit
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {purposes.map((p) => (
-                    <OptionTile
-                      key={p.value}
-                      selected={purpose === p.value}
-                      onClick={() => setPurpose(purpose === p.value ? '' : p.value)}
-                      emoji={p.emoji} label={p.value}
-                      disabled={isLoading}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* Submit */}
-              <button
-                type="submit"
-                disabled={isSubmitDisabled}
-                className={`w-full py-4 rounded-xl font-bold text-lg transition-all duration-300
-                  ${isSubmitDisabled
-                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                    : currentSession
-                      ? 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white shadow-lg shadow-orange-200 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0'
-                      : 'btn-shimmer text-white shadow-lg shadow-indigo-200 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0'
-                  }`}
-              >
-                {isLoading ? (
-                  <span className="flex items-center justify-center gap-3">
-                    <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    Processing...
-                  </span>
-                ) : currentSession ? '🔓 Clock Out' : '🔐 Clock In'}
-              </button>
-
-            </form>
+            {/* Bottom hint */}
+            <div style={{ textAlign:'center', marginTop:12, fontSize:11, color:'#2a2a3a' }}>
+              Library Attendance System • <span className="mono">v2.0</span>
+            </div>
           </div>
         )}
-      </div>
-
-      {/* Footer */}
-      <div className="glass border-t border-white/10 py-3 text-center z-10">
-        <p className="text-white/40 text-xs">Library Attendance System © {new Date().getFullYear()}</p>
-      </div>
+      </main>
     </div>
   );
 };
