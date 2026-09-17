@@ -55,7 +55,9 @@ router.get('/logs', async (req, res) => {
       .select(`
         id,
         student_number,
-        full_name,
+        last_name,
+        first_name,
+        middle_name,
         program,
         year_level,
         purpose,
@@ -83,7 +85,7 @@ router.get('/logs', async (req, res) => {
     }
 
     if (name) {
-      query = query.ilike('full_name', `%${name}%`);
+      query = query.or(`last_name.ilike.%${name}%,first_name.ilike.%${name}%`);
     }
 
     const { data: logs, error, count } = await query

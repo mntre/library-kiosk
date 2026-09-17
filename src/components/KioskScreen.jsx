@@ -37,7 +37,9 @@ const FieldLabel = ({ icon, text, required }) => (
 /* ── Main component ───────────────────────────────── */
 const KioskScreen = () => {
   const [studentNumber, setStudentNumber] = useState('');
-  const [fullName, setFullName]           = useState('');
+  const [lastName,  setLastName]          = useState('');
+  const [firstName, setFirstName]         = useState('');
+  const [middleName, setMiddleName]       = useState('');
   const [educationLevel, setEducLevel]    = useState('');
   const [strand, setStrand]               = useState('');
   const [customStrand, setCustomStrand]   = useState('');
@@ -119,7 +121,8 @@ const KioskScreen = () => {
 
   /* ── Helpers ──────────────────────────────────── */
   const clearDependent = () => {
-    setFullName(''); setEducLevel(''); setStrand(''); setCustomStrand('');
+    setLastName(''); setFirstName(''); setMiddleName('');
+    setEducLevel(''); setStrand(''); setCustomStrand('');
     setProgram(''); setCustomProgram(''); setYearLevel(''); setPurpose('');
     setCurrentSession(null); setError(''); lastConfirmed.current = '';
   };
@@ -148,7 +151,9 @@ const KioskScreen = () => {
           const r = await axios.get(`/api/students/${v}`);
           if (r.data.student) {
             const s = r.data.student;
-            setFullName(s.full_name || '');
+            setLastName(s.last_name   || '');
+            setFirstName(s.first_name || '');
+            setMiddleName(s.middle_name || '');
             setEducLevel(s.education_level || '');
             setStrand(s.strand || '');
             setProgram(s.program || '');
@@ -165,8 +170,9 @@ const KioskScreen = () => {
   const handleSubmit = async (e) => {
     e.preventDefault(); setError('');
     if (!studentNumber.trim()) return setError('Student number is required');
-    if (!fullName.trim())       return setError('Full name is required');
-    if (!educationLevel)        return setError('Please select education level');
+    if (!lastName.trim())      return setError('Last name is required');
+    if (!firstName.trim())     return setError('First name is required');
+    if (!educationLevel)       return setError('Please select education level');
     if (educationLevel === 'senior-high' && !strand) return setError('Please select your strand');
     if (educationLevel === 'senior-high' && strand === 'OTHER' && !customStrand.trim()) return setError('Please type your strand name');
     if (educationLevel === 'college' && !program) return setError('Please select your program');
@@ -180,17 +186,18 @@ const KioskScreen = () => {
       try { await axios.get(`/api/students/${studentNumber}`); }
       catch (err) {
         if (err.response?.status === 404) {
-          await axios.post('/api/students', { studentNumber, fullName, educationLevel, strand: finalStrand, customStrand, program: finalProgram, customProgram, yearLevel });
+          await axios.post('/api/students', { studentNumber, lastName, firstName, middleName, educationLevel, strand: finalStrand, customStrand, program: finalProgram, customProgram, yearLevel });
         }
       }
 
+      const displayName = `${firstName} ${lastName}`;
       if (currentSession) {
         await axios.post('/api/attendance/clock-out', { studentNumber });
         const dur = Math.round((new Date() - new Date(currentSession.timeIn)) / 60000);
-        setSuccessData({ name: fullName, type: 'out', time: new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }), duration: dur });
+        setSuccessData({ name: displayName, type: 'out', time: new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }), duration: dur });
       } else {
-        await axios.post('/api/attendance/clock-in', { studentNumber, fullName, educationLevel, strand: finalStrand, customStrand, program: finalProgram, customProgram, yearLevel, purpose });
-        setSuccessData({ name: fullName, type: 'in', time: new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }) });
+        await axios.post('/api/attendance/clock-in', { studentNumber, lastName, firstName, middleName, educationLevel, strand: finalStrand, customStrand, program: finalProgram, customProgram, yearLevel, purpose });
+        setSuccessData({ name: displayName, type: 'in', time: new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }) });
       }
       setShowSuccess(true);
     } catch (err) {
@@ -210,7 +217,7 @@ const KioskScreen = () => {
   };
   const g = getGreeting();
 
-  const canSubmit = !isLoading && studentNumber.trim() && fullName.trim() && educationLevel
+  const canSubmit = !isLoading && studentNumber.trim() && lastName.trim() && firstName.trim() && educationLevel
     && !(educationLevel === 'senior-high' && !strand)
     && !(educationLevel === 'senior-high' && strand === 'OTHER' && !customStrand.trim())
     && !(educationLevel === 'college' && !program)
@@ -378,32 +385,60 @@ const KioskScreen = () => {
                   </div>
                 )}
 
-                {/* Row 1: Student # + Full Name */}
+                {/* Row 1: Student # */}
+                <div>
+                  <FieldLabel icon="🎓" text="Student Number" required />
+                  <input
+                    className="input-dark"
+                    type="text"
+                    value={studentNumber}
+                    onChange={handleStudentNumberChange}
+                    placeholder="e.g. 21100887"
+                    disabled={isLoading}
+                    maxLength={50}
+                  />
+                </div>
+
+                {/* Row 2: Last Name + First Name */}
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
                   <div>
-                    <FieldLabel icon="🎓" text="Student Number" required />
+                    <FieldLabel icon="👤" text="Last Name" required />
                     <input
                       className="input-dark"
                       type="text"
-                      value={studentNumber}
-                      onChange={handleStudentNumberChange}
-                      placeholder="e.g. 21100887"
-                      disabled={isLoading}
-                      maxLength={50}
-                    />
-                  </div>
-                  <div>
-                    <FieldLabel icon="👤" text="Full Name" required />
-                    <input
-                      className="input-dark"
-                      type="text"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      placeholder="Your full name"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      placeholder="Dela Cruz"
                       disabled={isLoading}
                       maxLength={100}
                     />
                   </div>
+                  <div>
+                    <FieldLabel icon="👤" text="First Name" required />
+                    <input
+                      className="input-dark"
+                      type="text"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      placeholder="Juan"
+                      disabled={isLoading}
+                      maxLength={100}
+                    />
+                  </div>
+                </div>
+
+                {/* Row 3: Middle Name */}
+                <div>
+                  <FieldLabel icon="👤" text="Middle Name" />
+                  <input
+                    className="input-dark"
+                    type="text"
+                    value={middleName}
+                    onChange={(e) => setMiddleName(e.target.value)}
+                    placeholder="Santos (optional)"
+                    disabled={isLoading}
+                    maxLength={100}
+                  />
                 </div>
 
                 {/* Education Level */}

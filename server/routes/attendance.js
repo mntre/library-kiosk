@@ -4,30 +4,36 @@ const { supabase } = require('../database');
 
 // Clock In
 router.post('/clock-in', async (req, res) => {
-  const { studentNumber, fullName, educationLevel, strand, customStrand, program, customProgram, yearLevel, purpose } = req.body;
+  const {
+    studentNumber, lastName, firstName, middleName,
+    educationLevel, strand, customStrand,
+    program, customProgram, yearLevel, purpose
+  } = req.body;
 
   try {
     const currentTime = new Date();
     const { data, error } = await supabase
       .from('attendance_logs')
       .insert([{
-        student_number: studentNumber,
-        full_name: fullName,
+        student_number:  studentNumber,
+        last_name:       lastName       || null,
+        first_name:      firstName      || null,
+        middle_name:     middleName     || null,
         education_level: educationLevel || null,
-        strand: strand || null,
-        custom_strand: customStrand || null,
-        program: program || null,
-        custom_program: customProgram || null,
-        year_level: yearLevel || null,
-        purpose: purpose || null,
-        time_in: currentTime.toISOString(),
-        status: 'active'
+        strand:          strand         || null,
+        custom_strand:   customStrand   || null,
+        program:         program        || null,
+        custom_program:  customProgram  || null,
+        year_level:      yearLevel      || null,
+        purpose:         purpose        || null,
+        time_in:         currentTime.toISOString(),
+        status:          'active'
       }])
       .select();
 
     if (error) {
       console.error('Error inserting attendance log:', JSON.stringify(error));
-      return res.status(500).json({ 
+      return res.status(500).json({
         error: error.message,
         detail: error.details,
         hint: error.hint,
@@ -72,20 +78,14 @@ router.post('/clock-out', async (req, res) => {
     }
 
     if (!activeSession) {
-      return res.status(400).json({ 
-        error: 'No active session found. Please clock in first.' 
-      });
+      return res.status(400).json({ error: 'No active session found. Please clock in first.' });
     }
 
     const duration = Math.round((currentTime - new Date(activeSession.time_in)) / 1000);
 
     const { error: updateError } = await supabase
       .from('attendance_logs')
-      .update({
-        time_out: currentTime.toISOString(),
-        duration,
-        status: 'closed'
-      })
+      .update({ time_out: currentTime.toISOString(), duration, status: 'closed' })
       .eq('id', activeSession.id);
 
     if (updateError) {
@@ -114,7 +114,7 @@ router.get('/status/:studentNumber', async (req, res) => {
 
     const { data: session, error } = await supabase
       .from('attendance_logs')
-      .select('id, student_number, full_name, program, year_level, purpose, time_in, duration, status')
+      .select('id, student_number, last_name, first_name, middle_name, program, year_level, purpose, time_in, duration, status')
       .eq('student_number', studentNumber)
       .eq('status', 'active')
       .gte('time_in', todayStart.toISOString())
@@ -131,14 +131,16 @@ router.get('/status/:studentNumber', async (req, res) => {
       res.json({
         isClockedIn: true,
         session: {
-          id: session.id,
+          id:            session.id,
           studentNumber: session.student_number,
-          fullName: session.full_name,
-          program: session.program,
-          yearLevel: session.year_level,
-          purpose: session.purpose,
-          timeIn: session.time_in,
-          duration: session.duration
+          lastName:      session.last_name,
+          firstName:     session.first_name,
+          middleName:    session.middle_name,
+          program:       session.program,
+          yearLevel:     session.year_level,
+          purpose:       session.purpose,
+          timeIn:        session.time_in,
+          duration:      session.duration
         }
       });
     } else {
