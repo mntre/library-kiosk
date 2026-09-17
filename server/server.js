@@ -29,6 +29,25 @@ initDB()
   });
 
 function startServer() {
+  // Health check + debug endpoint
+  app.get('/api/health', async (req, res) => {
+    const { supabase } = require('./database');
+    try {
+      const { data, error } = await supabase.from('attendance_logs').select('count', { count: 'exact', head: true });
+      res.json({ 
+        status: 'ok', 
+        supabase: error ? 'error: ' + error.message : 'connected',
+        env: {
+          hasUrl: !!process.env.SUPABASE_URL,
+          hasKey: !!process.env.SUPABASE_SERVICE_KEY,
+          url: process.env.SUPABASE_URL?.slice(0, 40)
+        }
+      });
+    } catch (err) {
+      res.json({ status: 'error', message: err.message });
+    }
+  });
+
   // API Routes
   const attendanceRouter = require('./routes/attendance');
   const adminRouter = require('./routes/admin');
