@@ -114,7 +114,7 @@ router.get('/status/:studentNumber', async (req, res) => {
 
     const { data: session, error } = await supabase
       .from('attendance_logs')
-      .select('*')
+      .select('id, student_number, full_name, program, year_level, purpose, time_in, duration, status')
       .eq('student_number', studentNumber)
       .eq('status', 'active')
       .gte('time_in', todayStart.toISOString())
@@ -124,7 +124,7 @@ router.get('/status/:studentNumber', async (req, res) => {
 
     if (error) {
       console.error('Error checking session status:', error);
-      return res.status(500).json({ error: error.message });
+      return res.status(500).json({ error: error.message, code: error.code });
     }
 
     if (session) {
@@ -134,8 +134,6 @@ router.get('/status/:studentNumber', async (req, res) => {
           id: session.id,
           studentNumber: session.student_number,
           fullName: session.full_name,
-          educationLevel: session.education_level,
-          strand: session.strand,
           program: session.program,
           yearLevel: session.year_level,
           purpose: session.purpose,

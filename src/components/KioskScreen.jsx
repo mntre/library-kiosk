@@ -50,15 +50,10 @@ const KioskScreen = () => {
       setCurrentTime(new Date());
     }, 1000);
 
-    // Check for existing session
-    if (studentNumber) {
-      checkSession();
-    }
-
     return () => {
       clearInterval(clockInterval);
     };
-  }, [studentNumber]);
+  }, []);
 
   // Auto-reset after successful submission
   useEffect(() => {
@@ -80,37 +75,59 @@ const KioskScreen = () => {
     }
   };
 
-  const checkSession = async () => {
-    if (!studentNumber) return;
+  const sessionCheckTimer = React.useRef(null);
 
-    try {
-      const response = await axios.get(`/api/attendance/status/${studentNumber}`);
-      setCurrentSession(response.data.isClockedIn ? response.data.session : null);
-      setError('');
-    } catch (error) {
-      console.error('Error checking session:', error);
-    }
+  const checkSession = async (number) => {
+    if (!number || number.length < 6) return;
+
+    // Debounce session check
+    if (sessionCheckTimer.current) clearTimeout(sessionCheckTimer.current);
+    sessionCheckTimer.current = setTimeout(async () => {
+      try {
+        const response = await axios.get(`/api/attendance/status/${number}`);
+        setCurrentSession(response.data.isClockedIn ? response.data.session : null);
+        setError('');
+      } catch (error) {
+        // Silently ignore
+      }
+    }, 600);
   };
+
+  const studentLookupTimer = React.useRef(null);
 
   const handleStudentNumberChange = async (e) => {
     const value = e.target.value;
     setStudentNumber(value);
     setError('');
 
-    // Auto-fill if student exists
-    if (value.length >= 4) {
-      try {
-        const response = await axios.get(`/api/students/${value}`);
-        if (response.data.student) {
-          setFullName(response.data.student.full_name);
-          setEducationLevel(response.data.student.education_level || '');
-          setStrand(response.data.student.strand || '');
-          setProgram(response.data.student.program || '');
-          setYearLevel(response.data.student.year_level || '');
+    // Clear previous timer
+    if (studentLookupTimer.current) {
+      clearTimeout(studentLookupTimer.current);
+    }
+
+    // Only lookup after user stops typing for 600ms and has at least 6 chars
+    if (value.length >= 6) {
+      studentLookupTimer.current = setTimeout(async () => {
+        // Check if already clocked in
+        checkSession(value);
+
+        // Auto-fill student info
+        try {
+          const response = await axios.get(`/api/students/${value}`);
+          if (response.data.student) {
+            setFullName(response.data.student.full_name);
+            setEducationLevel(response.data.student.education_level || '');
+            setStrand(response.data.student.strand || '');
+            setProgram(response.data.student.program || '');
+            setYearLevel(response.data.student.year_level || '');
+          }
+        } catch (error) {
+          // 404 = student not found yet, that's fine — no need to log
         }
-      } catch (error) {
-        // Student not found, that's okay
-      }
+      }, 600);
+    } else {
+      // Reset session if student number is cleared
+      setCurrentSession(null);
     }
   };
 
