@@ -25,7 +25,7 @@ async function seedDatabase() {
   try {
     // Seed programs if empty
     const { count: programsCount, error: programsError } = await supabase
-      .from('Programs Table')
+      .from('programs')
       .select('*', { count: 'exact', head: true });
 
     if (!programsError && (!programsCount || programsCount === 0)) {
@@ -41,7 +41,7 @@ async function seedDatabase() {
       ];
 
       const { error: programsInsertError } = await supabase
-        .from('Programs Table')
+        .from('programs')
         .upsert(programs, { onConflict: 'code' });
 
       if (!programsInsertError) {
@@ -51,7 +51,7 @@ async function seedDatabase() {
 
     // Seed sample students if empty
     const { count: studentsCount, error: studentsError } = await supabase
-      .from('Students Table')
+      .from('students')
       .select('*', { count: 'exact', head: true });
 
     if (!studentsError && (!studentsCount || studentsCount === 0)) {
@@ -64,7 +64,7 @@ async function seedDatabase() {
       ];
 
       const { error: studentsInsertError } = await supabase
-        .from('Students Table')
+        .from('students')
         .upsert(students, { onConflict: 'student_number' });
 
       if (!studentsInsertError) {

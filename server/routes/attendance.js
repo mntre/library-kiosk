@@ -9,27 +9,28 @@ router.post('/clock-in', async (req, res) => {
   try {
     const currentTime = new Date();
     const { data, error } = await supabase
-      .from('Attendance Logs Table')
+      .from('attendance_logs')
       .insert([{
         student_number: studentNumber,
         full_name: fullName,
-        education_level: educationLevel,
-        strand,
-        custom_strand: customStrand,
-        program,
-        custom_program: customProgram,
-        year_level: yearLevel,
-        purpose,
+        education_level: educationLevel || null,
+        strand: strand || null,
+        custom_strand: customStrand || null,
+        program: program || null,
+        custom_program: customProgram || null,
+        year_level: yearLevel || null,
+        purpose: purpose || null,
         time_in: currentTime.toISOString(),
         status: 'active'
       }])
       .select();
 
     if (error) {
-      console.error('Error inserting attendance log:', error);
+      console.error('Error inserting attendance log:', JSON.stringify(error));
       return res.status(500).json({ 
-        error: 'Failed to clock in', 
-        detail: error.message,
+        error: error.message,
+        detail: error.details,
+        hint: error.hint,
         code: error.code
       });
     }
@@ -42,7 +43,7 @@ router.post('/clock-in', async (req, res) => {
     });
   } catch (err) {
     console.error('Error in clock-in:', err);
-    res.status(500).json({ error: 'Failed to clock in' });
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -52,21 +53,22 @@ router.post('/clock-out', async (req, res) => {
 
   try {
     const currentTime = new Date();
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
 
-    // Find active session for today
     const { data: activeSession, error: sessionError } = await supabase
-      .from('Attendance Logs Table')
+      .from('attendance_logs')
       .select('*')
       .eq('student_number', studentNumber)
       .eq('status', 'active')
-      .gte('time_in', new Date().toISOString().split('T')[0] + 'T00:00:00Z')
+      .gte('time_in', todayStart.toISOString())
       .order('time_in', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (sessionError) {
       console.error('Error finding active session:', sessionError);
-      return res.status(500).json({ error: 'Failed to clock out' });
+      return res.status(500).json({ error: sessionError.message });
     }
 
     if (!activeSession) {
@@ -75,11 +77,10 @@ router.post('/clock-out', async (req, res) => {
       });
     }
 
-    // Calculate duration in seconds
     const duration = Math.round((currentTime - new Date(activeSession.time_in)) / 1000);
 
     const { error: updateError } = await supabase
-      .from('Attendance Logs Table')
+      .from('attendance_logs')
       .update({
         time_out: currentTime.toISOString(),
         duration,
@@ -89,20 +90,17 @@ router.post('/clock-out', async (req, res) => {
 
     if (updateError) {
       console.error('Error updating attendance log:', updateError);
-      return res.status(500).json({ error: 'Failed to clock out' });
+      return res.status(500).json({ error: updateError.message });
     }
-
-    // Calculate duration in minutes
-    const durationMinutes = Math.round(duration / 60);
 
     res.json({
       success: true,
       message: 'Time Out recorded successfully',
-      duration: durationMinutes
+      duration: Math.round(duration / 60)
     });
   } catch (err) {
     console.error('Error in clock-out:', err);
-    res.status(500).json({ error: 'Failed to clock out' });
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -111,31 +109,22 @@ router.get('/status/:studentNumber', async (req, res) => {
   const { studentNumber } = req.params;
 
   try {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
     const { data: session, error } = await supabase
-      .from('Attendance Logs Table')
-      .select(`
-        id,
-        student_number,
-        full_name,
-        education_level,
-        strand,
-        program,
-        year_level,
-        purpose,
-        time_in,
-        duration,
-        students (full_name, education_level, strand, program, year_level)
-      `)
+      .from('attendance_logs')
+      .select('*')
       .eq('student_number', studentNumber)
       .eq('status', 'active')
-      .gte('time_in', new Date().toISOString().split('T')[0] + 'T00:00:00Z')
+      .gte('time_in', todayStart.toISOString())
       .order('time_in', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
-    if (error && error.code !== 'PGRST116') {
+    if (error) {
       console.error('Error checking session status:', error);
-      return res.status(500).json({ error: 'Failed to check status' });
+      return res.status(500).json({ error: error.message });
     }
 
     if (session) {
@@ -144,11 +133,11 @@ router.get('/status/:studentNumber', async (req, res) => {
         session: {
           id: session.id,
           studentNumber: session.student_number,
-          fullName: session.students?.full_name || session.full_name,
-          educationLevel: session.students?.education_level || session.education_level,
-          strand: session.students?.strand || session.strand,
-          program: session.students?.program || session.program,
-          yearLevel: session.students?.year_level || session.year_level,
+          fullName: session.full_name,
+          educationLevel: session.education_level,
+          strand: session.strand,
+          program: session.program,
+          yearLevel: session.year_level,
           purpose: session.purpose,
           timeIn: session.time_in,
           duration: session.duration
@@ -159,7 +148,7 @@ router.get('/status/:studentNumber', async (req, res) => {
     }
   } catch (err) {
     console.error('Error in status check:', err);
-    res.status(500).json({ error: 'Failed to check status' });
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -167,32 +156,20 @@ router.get('/status/:studentNumber', async (req, res) => {
 router.get('/active-sessions', async (req, res) => {
   try {
     const { data: sessions, error } = await supabase
-      .from('Attendance Logs Table')
-      .select(`
-        id,
-        student_number,
-        full_name,
-        education_level,
-        strand,
-        program,
-        year_level,
-        time_in,
-        duration,
-        status,
-        students (full_name, education_level, strand, program, year_level)
-      `)
+      .from('attendance_logs')
+      .select('*')
       .eq('status', 'active')
       .order('time_in', { ascending: false });
 
     if (error) {
       console.error('Error getting active sessions:', error);
-      return res.status(500).json({ error: 'Failed to get active sessions' });
+      return res.status(500).json({ error: error.message });
     }
 
     res.json({ sessions });
   } catch (err) {
     console.error('Error in active-sessions:', err);
-    res.status(500).json({ error: 'Failed to get active sessions' });
+    res.status(500).json({ error: err.message });
   }
 });
 

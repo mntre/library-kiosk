@@ -6,7 +6,7 @@ const { supabase } = require('../database');
 router.get('/', async (req, res) => {
   try {
     const { data: programs, error } = await supabase
-      .from('Programs Table')
+      .from('programs')
       .select('*')
       .order('code');
 
@@ -28,7 +28,7 @@ router.post('/', async (req, res) => {
 
   try {
     const { data, error } = await supabase
-      .from('Programs Table')
+      .from('programs')
       .insert([{
         code,
         name
@@ -61,7 +61,7 @@ router.put('/:id', async (req, res) => {
 
   try {
     const { data, error } = await supabase
-      .from('Programs Table')
+      .from('programs')
       .update({ code, name })
       .eq('id', id)
       .select();
@@ -91,7 +91,7 @@ router.delete('/:id', async (req, res) => {
 
   try {
     const { error } = await supabase
-      .from('Programs Table')
+      .from('programs')
       .delete()
       .eq('id', id);
 
