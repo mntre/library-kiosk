@@ -57,6 +57,8 @@ const AdminDashboard = () => {
   /* Live */
   const [liveSessions, setLiveSessions] = useState([]);
   const liveTimer = useRef(null);
+  // BUG-008: track whether logsPage effect has already run once to avoid double load on tab switch
+  const logsPageInitialized = useRef(false);
 
   /* Logs */
   const [logs, setLogs]                 = useState([]);
@@ -82,8 +84,19 @@ const AdminDashboard = () => {
     const u = localStorage.getItem('adminUser');
     if (!u) { window.location.href = '/admin/login'; return; }
     setAdminUser(JSON.parse(u));
+
+    // BUG-004: attach JWT token to every outgoing axios request
+    const token = localStorage.getItem('adminToken');
+    const interceptorId = axios.interceptors.request.use(config => {
+      if (token) config.headers['Authorization'] = `Bearer ${token}`;
+      return config;
+    });
+
     const t = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(t);
+    return () => {
+      clearInterval(t);
+      axios.interceptors.request.eject(interceptorId);
+    };
   }, []);
 
   /* ── Load on tab change ─────────────────────── */
@@ -97,6 +110,8 @@ const AdminDashboard = () => {
   }, [activeTab, adminUser]);
 
   useEffect(() => {
+    // BUG-008: skip initial render; only fire when logsPage actually changes
+    if (!logsPageInitialized.current) { logsPageInitialized.current = true; return; }
     if (activeTab === 'logs') loadLogs();
   }, [logsPage]);
 
@@ -105,6 +120,9 @@ const AdminDashboard = () => {
     try {
       const [statsRes, logsRes] = await Promise.all([
         axios.get('/api/admin/stats'),
+        // BUG-014: chart data is aggregated client-side from up to 500 records.
+        // If total attendance exceeds 500, charts will be incomplete.
+        // TODO: move aggregation server-side using SQL GROUP BY queries.
         axios.get('/api/admin/logs?limit=500')
       ]);
       setStats(statsRes.data);
@@ -646,7 +664,7 @@ const AdminDashboard = () => {
             <div style={{ fontSize:13, color:'#8b8baa', marginBottom:24 }}>You'll be redirected to the login page.</div>
             <div style={{ display:'flex', gap:12 }}>
               <button onClick={() => setShowLogout(false)} style={{ ...S.btnGhost, flex:1, padding:'10px', justifyContent:'center', display:'flex' }}>Cancel</button>
-              <button onClick={() => { localStorage.removeItem('adminUser'); window.location.href='/admin/login'; }} style={{ ...S.btnDanger, flex:1, padding:'10px', justifyContent:'center', display:'flex' }}>Sign Out</button>
+              <button onClick={() => { localStorage.removeItem('adminUser'); localStorage.removeItem('adminToken'); window.location.href='/admin/login'; }} style={{ ...S.btnDanger, flex:1, padding:'10px', justifyContent:'center', display:'flex' }}>Sign Out</button>
             </div>
           </div>
         </div>

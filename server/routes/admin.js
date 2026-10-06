@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const { supabase } = require('../database');
 
 // Login
@@ -8,11 +9,12 @@ router.post('/login', async (req, res) => {
   const { username, password } = req.body;
 
   try {
+    // BUG-011: use maybeSingle() so missing user returns null (not a PGRST116 error)
     const { data: user, error } = await supabase
       .from('admin_users')
       .select('*')
       .eq('username', username)
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('Error finding user:', error);
@@ -29,9 +31,17 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    // BUG-004: issue a signed JWT so the frontend can authenticate subsequent requests
+    const token = jwt.sign(
+      { id: user.id, username: user.username },
+      process.env.JWT_SECRET || 'fallback-secret',
+      { expiresIn: '8h' }
+    );
+
     res.json({
       success: true,
       message: 'Login successful',
+      token,
       user: {
         id: user.id,
         username: user.username
@@ -50,6 +60,7 @@ router.get('/logs', async (req, res) => {
   try {
     const offset = (page - 1) * limit;
 
+    // BUG-007: added education_level and strand to SELECT
     let query = supabase
       .from('attendance_logs')
       .select(`
@@ -58,6 +69,8 @@ router.get('/logs', async (req, res) => {
         last_name,
         first_name,
         middle_name,
+        education_level,
+        strand,
         program,
         year_level,
         purpose,
@@ -113,13 +126,15 @@ router.get('/logs', async (req, res) => {
 // Get attendance stats
 router.get('/stats', async (req, res) => {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    // BUG-009: use local midnight (consistent with attendance.js) instead of hardcoded UTC
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
 
     // Total visits today
     const { data: todayTotal, error: todayError } = await supabase
       .from('attendance_logs')
       .select('count', { count: 'exact', head: true })
-      .gte('time_in', today + 'T00:00:00Z')
+      .gte('time_in', todayStart.toISOString())
       .eq('status', 'closed');
 
     if (todayError) {
@@ -142,7 +157,7 @@ router.get('/stats', async (req, res) => {
     const { data: avgDuration, error: avgError } = await supabase
       .from('attendance_logs')
       .select('duration')
-      .gte('time_in', today + 'T00:00:00Z')
+      .gte('time_in', todayStart.toISOString())
       .eq('status', 'closed')
       .not('duration', 'is', null);
 
@@ -171,11 +186,12 @@ router.post('/close-session', async (req, res) => {
   const { logId } = req.body;
 
   try {
+    // BUG-011 (same pattern): use maybeSingle() so missing session returns null cleanly
     const { data: session, error: sessionError } = await supabase
       .from('attendance_logs')
       .select('*')
       .eq('id', logId)
-      .single();
+      .maybeSingle();
 
     if (sessionError) {
       console.error('Error finding session:', sessionError);

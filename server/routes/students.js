@@ -64,6 +64,11 @@ router.post('/', async (req, res) => {
     program, customProgram, yearLevel
   } = req.body;
 
+  // BUG-012: server-side validation — studentNumber is required
+  if (!studentNumber || !studentNumber.trim()) {
+    return res.status(400).json({ error: 'studentNumber is required' });
+  }
+
   try {
     const { data, error } = await supabase
       .from('students')

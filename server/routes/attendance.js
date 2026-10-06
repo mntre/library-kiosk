@@ -10,7 +10,32 @@ router.post('/clock-in', async (req, res) => {
     program, customProgram, yearLevel, purpose
   } = req.body;
 
+  // BUG-012: server-side validation — studentNumber is required
+  if (!studentNumber || !studentNumber.trim()) {
+    return res.status(400).json({ error: 'studentNumber is required' });
+  }
+
   try {
+    // BUG-005: check for an existing active session before inserting
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const { data: existing, error: existingError } = await supabase
+      .from('attendance_logs')
+      .select('id')
+      .eq('student_number', studentNumber)
+      .eq('status', 'active')
+      .gte('time_in', todayStart.toISOString())
+      .maybeSingle();
+
+    if (existingError) {
+      console.error('Error checking for existing session:', existingError);
+      return res.status(500).json({ error: existingError.message });
+    }
+
+    if (existing) {
+      return res.status(409).json({ error: 'Student already has an active session.' });
+    }
     const currentTime = new Date();
     const { data, error } = await supabase
       .from('attendance_logs')

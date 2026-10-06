@@ -26,6 +26,11 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   const { code, name } = req.body;
 
+  // BUG-012: server-side validation — code and name are required
+  if (!code || !code.trim() || !name || !name.trim()) {
+    return res.status(400).json({ error: 'code and name are required' });
+  }
+
   try {
     const { data, error } = await supabase
       .from('programs')
@@ -58,6 +63,11 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
   const { code, name } = req.body;
+
+  // BUG-012: server-side validation — code and name are required
+  if (!code || !code.trim() || !name || !name.trim()) {
+    return res.status(400).json({ error: 'code and name are required' });
+  }
 
   try {
     const { data, error } = await supabase

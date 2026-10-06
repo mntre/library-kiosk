@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const jwt = require('jsonwebtoken');
 const { initDB, seedDatabase } = require('./database');
 const bcrypt = require('bcrypt');
 
@@ -15,6 +16,19 @@ app.use(express.urlencoded({ extended: true }));
 
 // Serve static files from build directory
 app.use(express.static(path.join(__dirname, '../dist')));
+
+// Auth middleware for admin routes (all routes except POST /login)
+function requireAdminAuth(req, res, next) {
+  if (req.path === '/login' && req.method === 'POST') return next();
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1]; // "Bearer <token>"
+  if (!token) return res.status(401).json({ error: 'Authentication required' });
+  jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret', (err, user) => {
+    if (err) return res.status(401).json({ error: 'Invalid or expired token' });
+    req.adminUser = user;
+    next();
+  });
+}
 
 // Database initialization
 initDB()
@@ -55,7 +69,7 @@ function startServer() {
   const studentsRouter = require('./routes/students');
 
   app.use('/api/attendance', attendanceRouter);
-  app.use('/api/admin', adminRouter);
+  app.use('/api/admin', requireAdminAuth, adminRouter);
   app.use('/api/programs', programsRouter);
   app.use('/api/students', studentsRouter);
 

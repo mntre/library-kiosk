@@ -187,6 +187,8 @@ const KioskScreen = () => {
       catch (err) {
         if (err.response?.status === 404) {
           await axios.post('/api/students', { studentNumber, lastName, firstName, middleName, educationLevel, strand: finalStrand, customStrand, program: finalProgram, customProgram, yearLevel });
+        } else {
+          throw err; // re-throw non-404 errors so the outer catch shows the error
         }
       }
 

@@ -21,6 +21,7 @@ const AdminLogin = () => {
       const r = await axios.post('/api/admin/login', { username, password });
       if (r.data.success) {
         localStorage.setItem('adminUser', JSON.stringify(r.data.user));
+        localStorage.setItem('adminToken', r.data.token); // BUG-004: store JWT for admin API auth
         navigate('/admin');
       }
     } catch (err) {
